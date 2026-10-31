@@ -55,7 +55,10 @@ button { font-family: inherit; font-weight: 800; cursor: pointer; border: none; 
 .btn.blue { background: var(--blue); color: #fff; }
 .btn.green { background: var(--green); color: #fff; }
 .btn.purple { background: var(--purple); color: #fff; }
+.btn.yellow { background: var(--yellow); }
+.btn-note { font-size: .6em; opacity: .75; }
 .btn.small { font-size: 17px; padding: 12px; border-radius: 16px; }
+.ten-frame .dot.empty { background: transparent; border: 3px dashed #e3d3b5; }
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; }
 
@@ -176,8 +179,13 @@ button:focus-visible { outline: 4px solid var(--blue); outline-offset: 3px; }
   .stamp-row { gap: 1.2vw; }
   .stamp { font-size: 2.6vh; }
   .stamp.got { font-size: 4.5vh; }
-  .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 3vh 2.5vw; max-width: 1300px; margin: 0 auto; }
-  .menu .btn { margin: 0; padding: 5vh 2vw; font-size: 4.4vh; border-radius: 3vh; }
+  .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5vh 2.5vw; max-width: 1300px; margin: 0 auto; }
+  .menu .btn { margin: 0; padding: 2.4vh 2vw; font-size: 4.4vh; border-radius: 3vh; }
+  #home h1 { margin: 0.5vh 0 0.5vh; }
+  #home .lead { margin-bottom: 1.5vh; }
+  #home .stamps { margin-bottom: 2.5vh; padding: 1.5vh 2vh; }
+  #home .voice-row { margin-top: 2.5vh; }
+  .menu .btn.wide { grid-column: span 2; }
   .btn .ico { font-size: 5.5vh; }
   .voice-row { max-width: 460px; margin: 3.5vh auto 0; }
   .btn.small { font-size: 2.8vh; padding: 1.8vh; border-radius: 2vh; }
@@ -257,6 +265,7 @@ button:focus-visible { outline: 4px solid var(--blue); outline-offset: 3px; }
       <div class="stamp-row" id="stampRow"></div>
     </div>
     <div class="menu">
+      <button class="btn yellow wide" data-go="add"><span class="ico">➕</span>たしざん<small class="btn-note">こたえ 10まで</small></button>
       <button class="btn blue" data-go="learn"><span class="ico">📖</span>おぼえる</button>
       <button class="btn orange" data-go="battle"><span class="ico">⚔️</span>たたかう</button>
       <button class="btn green" data-go="time"><span class="ico">⏱️</span>タイムアタック</button>
@@ -410,7 +419,14 @@ const YOMI = {
   8: ['はちいちが はち','はちに じゅうろく','はちさん にじゅうし','はちし さんじゅうに','はちご しじゅう','はちろく しじゅうはち','はちしち ごじゅうろく','はっぱ ろくじゅうし','はっく しちじゅうに'],
   9: ['くいちが く','くに じゅうはち','くさん にじゅうしち','くし さんじゅうろく','くご しじゅうご','くろく ごじゅうし','くしち ろくじゅうさん','くは しちじゅうに','くく はちじゅういち'],
 };
-const MONSTERS = { 1:'🐛', 2:'🐸', 3:'🐙', 4:'🦀', 5:'🐊', 6:'🦈', 7:'🦂', 8:'🐲', 9:'🦖', mix:'👾' };
+const MONSTERS = { 1:'🐛', 2:'🐸', 3:'🐙', 4:'🦀', 5:'🐊', 6:'🦈', 7:'🦂', 8:'🐲', 9:'🦖', mix:'👾', add:'👻' };
+const NUM = ['ぜろ','いち','に','さん','よん','ご','ろく','なな','はち','きゅう','じゅう'];
+
+// 問題は [a, b, op]。op が '+' ならたし算、それ以外はかけ算
+const isAdd = q => q[2] === '+';
+const answer = q => isAdd(q) ? q[0] + q[1] : q[0] * q[1];
+const sym = q => isAdd(q) ? '+' : '×';
+const yomi = q => isAdd(q) ? `${NUM[q[0]]} たす ${NUM[q[1]]} は ${NUM[answer(q)]}` : YOMI[q[0]][q[1] - 1];
 const DOT_COLORS = ['#ff7a59','#4aa3ff','#4cc38a','#ffb321','#ff8fb1','#9b7bff','#2ec4c4','#e8743b','#7a9cff'];
 const $ = id => document.getElementById(id);
 
@@ -418,7 +434,7 @@ const $ = id => document.getElementById(id);
 let save = { stats: {}, stamps: {}, best: 0, voice: true };
 try { const s = JSON.parse(localStorage.getItem('kuku-save')); if (s) save = Object.assign(save, s); } catch (e) {}
 function persist() { try { localStorage.setItem('kuku-save', JSON.stringify(save)); } catch (e) {} }
-function stat(a, b) { const k = a + 'x' + b; return save.stats[k] || (save.stats[k] = { ok: 0, ng: 0 }); }
+function stat(a, b, op = 'x') { const k = a + op + b; return save.stats[k] || (save.stats[k] = { ok: 0, ng: 0 }); }
 function level(a, b) {
   const s = save.stats[a + 'x' + b];
   if (!s || s.ok + s.ng === 0) return 0;
@@ -428,12 +444,12 @@ function level(a, b) {
   return 1;
 }
 // にがてな問題ほど出やすくする
-function weight(a, b) {
-  const s = stat(a, b);
+function weight(a, b, op) {
+  const s = stat(a, b, op);
   return 1 + (s.ok === 0 ? 1 : 0) + 4 * s.ng / (s.ok + s.ng + 1);
 }
 function pickWeighted(list) {
-  const ws = list.map(([a, b]) => weight(a, b));
+  const ws = list.map(([a, b, op]) => weight(a, b, op));
   let r = Math.random() * ws.reduce((x, y) => x + y, 0);
   for (let i = 0; i < list.length; i++) { r -= ws[i]; if (r <= 0) return list[i]; }
   return list[list.length - 1];
@@ -485,6 +501,7 @@ document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('ho
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => {
   const g = b.dataset.go;
   if (g === 'learn' || g === 'battle') openSelect(g);
+  if (g === 'add') startBattle('add');
   if (g === 'time') openTime();
   if (g === 'table') openTable();
 });
@@ -517,6 +534,25 @@ function renderDots(el, a, b) {
   }
 }
 function dotCaption(a, b) { return `${b}こ の まとまりが ${a}れつ あるよ`; }
+// たし算は 10マスの わく（赤が a、青が b、のこりは からっぽ）
+function renderQDots(el, q) {
+  el.classList.toggle('ten-frame', isAdd(q));
+  if (!isAdd(q)) return renderDots(el, q[0], q[1]);
+  const [a, b] = q;
+  el.innerHTML = '';
+  el.style.gridTemplateColumns = 'repeat(5, auto)';
+  for (let i = 0; i < 10; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < a + b ? '' : ' empty');
+    if (i < a + b) d.style.background = i < a ? DOT_COLORS[0] : DOT_COLORS[1];
+    d.style.width = d.style.height = '30px';
+    el.appendChild(d);
+  }
+}
+function qCaption(q, withAnswer) {
+  if (!isAdd(q)) return dotCaption(q[0], q[1]) + (withAnswer ? '' : '。ぜんぶで いくつ？');
+  return `あか ${q[0]}こ と あお ${q[1]}こ` + (withAnswer ? `で ${answer(q)}こ` : '。あわせて いくつ？');
+}
 
 // ===== だん選択 =====
 let selectMode = 'battle';
@@ -615,14 +651,22 @@ document.addEventListener('keydown', e => {
 let B = null;
 function startBattle(dan) {
   let queue;
+  const pickUnique = (all, n) => {
+    const res = [];
+    while (res.length < n) {
+      const p = pickWeighted(all);
+      if (!res.includes(p)) res.push(p);
+    }
+    return res;
+  };
   if (dan === 'mix') {
     const all = [];
     for (let a = 2; a <= 9; a++) for (let b = 1; b <= 9; b++) all.push([a, b]);
-    queue = [];
-    while (queue.length < 12) {
-      const p = pickWeighted(all);
-      if (!queue.some(q => q[0] === p[0] && q[1] === p[1])) queue.push(p);
-    }
+    queue = pickUnique(all, 12);
+  } else if (dan === 'add') {
+    const all = [];
+    for (let a = 1; a <= 9; a++) for (let b = 1; a + b <= 10; b++) all.push([a, b, '+']);
+    queue = pickUnique(all, 10);
   } else {
     queue = shuffle([1,2,3,4,5,6,7,8,9].map(b => [dan, b]));
   }
@@ -642,8 +686,8 @@ function nextBattleQ() {
   $('bCombo').textContent = B.combo >= 2 ? `🔥 ${B.combo} れんぞく！` : '';
 }
 function renderBattleQ() {
-  const [a, b] = B.queue[0];
-  $('bQuestion').innerHTML = `${a} × ${b} = <span class="ans">${B.input || '&nbsp;'}</span>`;
+  const q = B.queue[0];
+  $('bQuestion').innerHTML = `${q[0]} ${sym(q)} ${q[1]} = <span class="ans">${B.input || '&nbsp;'}</span>`;
 }
 const battleInput = {
   digit(k) { if (B.lock || B.input.length >= 2) return; sfx.key(); B.input = (B.input === '0' ? '' : B.input) + k; renderBattleQ(); },
@@ -651,12 +695,12 @@ const battleInput = {
   go() {
     if (B.lock || B.input === '') return;
     B.lock = true;
-    const [a, b] = B.queue[0];
-    const s = stat(a, b);
-    if (+B.input === a * b) {
+    const q = B.queue[0];
+    const s = stat(q[0], q[1], q[2]);
+    if (+B.input === answer(q)) {
       s.ok++; persist();
       B.queue.shift(); B.done++; B.combo++;
-      sfx.ok(); speak(YOMI[a][b - 1]);
+      sfx.ok(); speak(yomi(q));
       $('bQuestion').classList.add('ok');
       const m = $('monster');
       m.classList.remove('hit'); void m.offsetWidth; m.classList.add('hit');
@@ -670,35 +714,35 @@ const battleInput = {
       else setTimeout(nextBattleQ, 900);
     } else {
       s.ng++; persist();
-      B.miss++; B.combo = 0; B.missed.add(a + 'x' + b);
+      B.miss++; B.combo = 0; B.missed.add(`${q[0]}${sym(q)}${q[1]}`);
       sfx.ng();
       $('bQuestion').classList.add('ng');
       const m = $('monster');
       m.classList.remove('angry'); void m.offsetWidth; m.classList.add('angry');
       // まちがえた問題は少しあとでもう一度
-      const q = B.queue.shift();
+      B.queue.shift();
       B.queue.splice(Math.min(2, B.queue.length), 0, q);
-      setTimeout(() => showNg(a, b), 450);
+      setTimeout(() => showNg(q), 450);
     }
   }
 };
 buildKeypad($('bKeypad'), k => battleInput.digit(k), () => battleInput.del(), () => battleInput.go());
 
-function showNg(a, b) {
-  $('ngEq').textContent = `${a} × ${b} = ${a * b}`;
-  $('ngYomi').textContent = YOMI[a][b - 1];
-  $('ngCaption').textContent = dotCaption(a, b);
-  renderDots($('ngDots'), a, b);
+function showNg(q) {
+  $('ngEq').textContent = `${q[0]} ${sym(q)} ${q[1]} = ${answer(q)}`;
+  $('ngYomi').textContent = yomi(q);
+  $('ngCaption').textContent = qCaption(q, true);
+  renderQDots($('ngDots'), q);
   $('ngModal').classList.add('show');
-  speak(YOMI[a][b - 1]);
+  speak(yomi(q));
 }
 $('ngNext').onclick = () => { $('ngModal').classList.remove('show'); nextBattleQ(); };
 
 $('hintBtn').onclick = () => {
   if (!B || B.lock) return;
-  const [a, b] = B.queue[0];
-  $('hintCaption').textContent = `${dotCaption(a, b)}。ぜんぶで いくつ？`;
-  renderDots($('hintDots'), a, b);
+  const q = B.queue[0];
+  $('hintCaption').textContent = qCaption(q, false);
+  renderQDots($('hintDots'), q);
   $('hintModal').classList.add('show');
 };
 $('hintClose').onclick = () => $('hintModal').classList.remove('show');
@@ -709,7 +753,7 @@ function winBattle() {
   setTimeout(() => {
     const stars = B.miss === 0 ? 3 : B.miss <= 2 ? 2 : 1;
     let msg = '';
-    if (B.dan !== 'mix') {
+    if (typeof B.dan === 'number') {
       const first = !save.stamps[B.dan];
       save.stamps[B.dan] = true; persist();
       msg = first ? `${B.dan}のだんの スタンプを ゲット！` : '';
@@ -717,7 +761,7 @@ function winBattle() {
     const praise = stars === 3 ? 'ノーミス！ すごすぎる！' : stars === 2 ? 'よく がんばったね！' : 'さいごまで できたね！ つぎは ノーミスを めざそう';
     showResult({
       emoji: '🎉', title: `${MONSTERS[B.dan]} を たおした！`, stars,
-      msg: `${praise}<br>${msg}` + (B.missed.size ? `<br><small>にがて：${[...B.missed].map(k => k.replace('x', '×')).join('、')}</small>` : ''),
+      msg: `${praise}<br>${msg}` + (B.missed.size ? `<br><small>にがて：${[...B.missed].join('、')}</small>` : ''),
       retry: () => startBattle(B.dan),
     });
   }, 800);
