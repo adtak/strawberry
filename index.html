@@ -58,7 +58,12 @@ button { font-family: inherit; font-weight: 800; cursor: pointer; border: none; 
 .btn.yellow { background: var(--yellow); }
 .btn-note { font-size: .6em; opacity: .75; }
 .btn.small { font-size: 17px; padding: 12px; border-radius: 16px; }
+.btn.pink { background: var(--pink); }
 .ten-frame .dot.empty { background: transparent; border: 3px dashed #e3d3b5; }
+/* かずならべの かずの せん */
+.nl { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; background: #f4ece0; color: #b9a990; }
+.nl.on { background: var(--blue); color: #fff; }
+.nl.q { background: var(--yellow); color: var(--ink); }
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; }
 
@@ -185,7 +190,7 @@ button:focus-visible { outline: 4px solid var(--blue); outline-offset: 3px; }
   #home .lead { margin-bottom: 1.5vh; }
   #home .stamps { margin-bottom: 2.5vh; padding: 1.5vh 2vh; }
   #home .voice-row { margin-top: 2.5vh; }
-  .menu .btn.wide { grid-column: span 2; }
+  .nl { width: 7.5vh; height: 7.5vh; font-size: 3.8vh; }
   .btn .ico { font-size: 5.5vh; }
   .voice-row { max-width: 460px; margin: 3.5vh auto 0; }
   .btn.small { font-size: 2.8vh; padding: 1.8vh; border-radius: 2vh; }
@@ -265,7 +270,8 @@ button:focus-visible { outline: 4px solid var(--blue); outline-offset: 3px; }
       <div class="stamp-row" id="stampRow"></div>
     </div>
     <div class="menu">
-      <button class="btn yellow wide" data-go="add"><span class="ico">➕</span>たしざん<small class="btn-note">こたえ 10まで</small></button>
+      <button class="btn pink" data-go="seq"><span class="ico">🔢</span>かずならべ<small class="btn-note">まんなかは なに？</small></button>
+      <button class="btn yellow" data-go="add"><span class="ico">➕</span>たしざん<small class="btn-note">こたえ 10まで</small></button>
       <button class="btn blue" data-go="learn"><span class="ico">📖</span>おぼえる</button>
       <button class="btn orange" data-go="battle"><span class="ico">⚔️</span>たたかう</button>
       <button class="btn green" data-go="time"><span class="ico">⏱️</span>タイムアタック</button>
@@ -419,14 +425,18 @@ const YOMI = {
   8: ['はちいちが はち','はちに じゅうろく','はちさん にじゅうし','はちし さんじゅうに','はちご しじゅう','はちろく しじゅうはち','はちしち ごじゅうろく','はっぱ ろくじゅうし','はっく しちじゅうに'],
   9: ['くいちが く','くに じゅうはち','くさん にじゅうしち','くし さんじゅうろく','くご しじゅうご','くろく ごじゅうし','くしち ろくじゅうさん','くは しちじゅうに','くく はちじゅういち'],
 };
-const MONSTERS = { 1:'🐛', 2:'🐸', 3:'🐙', 4:'🦀', 5:'🐊', 6:'🦈', 7:'🦂', 8:'🐲', 9:'🦖', mix:'👾', add:'👻' };
+const MONSTERS = { 1:'🐛', 2:'🐸', 3:'🐙', 4:'🦀', 5:'🐊', 6:'🦈', 7:'🦂', 8:'🐲', 9:'🦖', mix:'👾', add:'👻', seq:'🐭' };
 const NUM = ['ぜろ','いち','に','さん','よん','ご','ろく','なな','はち','きゅう','じゅう'];
 
-// 問題は [a, b, op]。op が '+' ならたし算、それ以外はかけ算
+// 問題は [a, b, op]。op が '+' ならたし算、'seq' なら a と b の まんなかの かず、それ以外はかけ算
 const isAdd = q => q[2] === '+';
-const answer = q => isAdd(q) ? q[0] + q[1] : q[0] * q[1];
-const sym = q => isAdd(q) ? '+' : '×';
-const yomi = q => isAdd(q) ? `${NUM[q[0]]} たす ${NUM[q[1]]} は ${NUM[answer(q)]}` : YOMI[q[0]][q[1] - 1];
+const isSeq = q => q[2] === 'seq';
+const answer = q => isSeq(q) ? q[0] + 1 : isAdd(q) ? q[0] + q[1] : q[0] * q[1];
+const yomi = q => isSeq(q) ? `${NUM[q[0]]}、${NUM[answer(q)]}、${NUM[q[1]]}`
+  : isAdd(q) ? `${NUM[q[0]]} たす ${NUM[q[1]]} は ${NUM[answer(q)]}` : YOMI[q[0]][q[1] - 1];
+// ans を こたえの ところに いれた しき
+const qText = (q, ans) => isSeq(q) ? `${q[0]}&nbsp;&nbsp;${ans}&nbsp;&nbsp;${q[1]}`
+  : `${q[0]} ${isAdd(q) ? '+' : '×'} ${q[1]} = ${ans}`;
 const DOT_COLORS = ['#ff7a59','#4aa3ff','#4cc38a','#ffb321','#ff8fb1','#9b7bff','#2ec4c4','#e8743b','#7a9cff'];
 const $ = id => document.getElementById(id);
 
@@ -501,7 +511,7 @@ document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('ho
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => {
   const g = b.dataset.go;
   if (g === 'learn' || g === 'battle') openSelect(g);
-  if (g === 'add') startBattle('add');
+  if (g === 'add' || g === 'seq') startBattle(g);
   if (g === 'time') openTime();
   if (g === 'table') openTable();
 });
@@ -537,6 +547,7 @@ function dotCaption(a, b) { return `${b}こ の まとまりが ${a}れつ あ�
 // たし算は 10マスの わく（赤が a、青が b、のこりは からっぽ）
 function renderQDots(el, q) {
   el.classList.toggle('ten-frame', isAdd(q));
+  if (isSeq(q)) return renderNumberLine(el, q, el.id === 'ngDots');
   if (!isAdd(q)) return renderDots(el, q[0], q[1]);
   const [a, b] = q;
   el.innerHTML = '';
@@ -549,7 +560,20 @@ function renderQDots(el, q) {
     el.appendChild(d);
   }
 }
+// かずの せん（まわりの かずも すこし みせる）
+function renderNumberLine(el, q, showAnswer) {
+  const lo = Math.max(0, q[0] - 2), hi = Math.min(10, q[1] + 2), mid = answer(q);
+  el.innerHTML = '';
+  el.style.gridTemplateColumns = `repeat(${hi - lo + 1}, auto)`;
+  for (let n = lo; n <= hi; n++) {
+    const c = document.createElement('div');
+    c.className = 'nl' + (n === mid ? ' q' : n === q[0] || n === q[1] ? ' on' : '');
+    c.textContent = n === mid && !showAnswer ? '？' : n;
+    el.appendChild(c);
+  }
+}
 function qCaption(q, withAnswer) {
+  if (isSeq(q)) return withAnswer ? `${q[0]} の つぎは ${answer(q)}、${answer(q)} の つぎは ${q[1]}` : `${q[0]} の つぎの かずは なに？`;
   if (!isAdd(q)) return dotCaption(q[0], q[1]) + (withAnswer ? '' : '。ぜんぶで いくつ？');
   return `あか ${q[0]}こ と あお ${q[1]}こ` + (withAnswer ? `で ${answer(q)}こ` : '。あわせて いくつ？');
 }
@@ -667,6 +691,10 @@ function startBattle(dan) {
     const all = [];
     for (let a = 1; a <= 9; a++) for (let b = 1; a + b <= 10; b++) all.push([a, b, '+']);
     queue = pickUnique(all, 10);
+  } else if (dan === 'seq') {
+    const all = [];
+    for (let m = 1; m <= 9; m++) all.push([m - 1, m + 1, 'seq']);
+    queue = pickUnique(all, 8);
   } else {
     queue = shuffle([1,2,3,4,5,6,7,8,9].map(b => [dan, b]));
   }
@@ -686,8 +714,7 @@ function nextBattleQ() {
   $('bCombo').textContent = B.combo >= 2 ? `🔥 ${B.combo} れんぞく！` : '';
 }
 function renderBattleQ() {
-  const q = B.queue[0];
-  $('bQuestion').innerHTML = `${q[0]} ${sym(q)} ${q[1]} = <span class="ans">${B.input || '&nbsp;'}</span>`;
+  $('bQuestion').innerHTML = qText(B.queue[0], `<span class="ans">${B.input || '&nbsp;'}</span>`);
 }
 const battleInput = {
   digit(k) { if (B.lock || B.input.length >= 2) return; sfx.key(); B.input = (B.input === '0' ? '' : B.input) + k; renderBattleQ(); },
@@ -714,7 +741,7 @@ const battleInput = {
       else setTimeout(nextBattleQ, 900);
     } else {
       s.ng++; persist();
-      B.miss++; B.combo = 0; B.missed.add(`${q[0]}${sym(q)}${q[1]}`);
+      B.miss++; B.combo = 0; B.missed.add(isSeq(q) ? `${q[0]}□${q[1]}` : qText(q, '').replace(/ = $/, ''));
       sfx.ng();
       $('bQuestion').classList.add('ng');
       const m = $('monster');
@@ -729,7 +756,7 @@ const battleInput = {
 buildKeypad($('bKeypad'), k => battleInput.digit(k), () => battleInput.del(), () => battleInput.go());
 
 function showNg(q) {
-  $('ngEq').textContent = `${q[0]} ${sym(q)} ${q[1]} = ${answer(q)}`;
+  $('ngEq').innerHTML = qText(q, answer(q));
   $('ngYomi').textContent = yomi(q);
   $('ngCaption').textContent = qCaption(q, true);
   renderQDots($('ngDots'), q);
